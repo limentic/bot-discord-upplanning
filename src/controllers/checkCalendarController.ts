@@ -6,7 +6,7 @@ import { join } from 'path'
 import { RequestWithDiscordService } from '..'
 import { generateMarkdownCalendar } from '../services/calendarService'
 
-const TEMP_FOLDER = join(__dirname, '..', 'temp')
+const TEMP_FOLDER = join(__dirname, '../..', 'temp')
 const CALENDAR_FILE_PATH = join(TEMP_FOLDER, 'calendar.ical')
 
 const ignoreFields = ['DTSTAMP', 'SEQUENCE']
