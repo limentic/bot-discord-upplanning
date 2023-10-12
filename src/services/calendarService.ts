@@ -1,7 +1,11 @@
-import { parse, startOfWeek, lastDayOfWeek, format, addDays } from 'date-fns';
+import { lastDayOfWeek, format, addDays } from 'date-fns'
 import { sync, VEvent } from 'node-ical'
+import { mondayOfCurrentWeek } from './timeService'
 
-export const generateMarkdownCalendar = (icalContent: string): string => {
+export const generateMarkdownCalendar = (
+  icalContent: string,
+  currentDate: Date,
+): string => {
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const frenchDaysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
@@ -26,10 +30,10 @@ export const generateMarkdownCalendar = (icalContent: string): string => {
   daysOfWeek.forEach((day, index) => {
     dayTables[day].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
 
-    const startOfCurrentWeek = startOfWeek(new Date())
-    const currentDate = addDays(startOfCurrentWeek, index)
+    const startOfCurrentWeek = mondayOfCurrentWeek(currentDate)
+    const currentDay = addDays(startOfCurrentWeek, index)
 
-    markdownCalendar.push(`## ${frenchDaysOfWeek[index]} ${format(currentDate, 'dd/MM/yyyy')}\n\n`)
+    markdownCalendar.push(`## ${frenchDaysOfWeek[index]} ${format(currentDay, 'dd/MM/yyyy')}\n\n`)
     for (const event of dayTables[day]) {
       markdownCalendar.push(
         `- ${format(new Date(event.start), 'HH:mm')} - ${format(new Date(event.end), 'HH:mm')} : ${event.summary} | ${
@@ -40,8 +44,8 @@ export const generateMarkdownCalendar = (icalContent: string): string => {
     markdownCalendar.push('\n')
   })
 
-  return `# EDT du ${format(startOfWeek(new Date()), 'dd/MM/yyyy')} au ${format(
-    lastDayOfWeek(new Date()),
+  return `# EDT du ${format(mondayOfCurrentWeek(currentDate), 'dd/MM/yyyy')} au ${format(
+    lastDayOfWeek(currentDate),
     'dd/MM/yyyy',
   )}\n\n${markdownCalendar.join('')}`
 }

@@ -2,4 +2,5 @@ Every hour:
 0 * * * * curl http://localhost:3000/check-calendar
 
 Every Sunday at 6 PM:
-0 18 * * 0 curl http://localhost:3000/calendar
+0 18 * * 0 curl http://localhost:3000/set-next-week && curl http://localhost:3000/calendar
+
