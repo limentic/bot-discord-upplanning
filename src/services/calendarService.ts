@@ -1,10 +1,21 @@
-import { lastDayOfWeek, format, addDays } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { sync, VEvent } from 'node-ical'
-import { mondayOfCurrentWeek } from './timeService'
+import { mondayOfWeek, sundayOfWeek } from './timeService'
+
+interface EDTEvent {
+  id?: string | number
+  title: string
+  start: string | Date
+  end?: string | Date
+  allDay?: boolean
+  backgroundColor?: string
+  borderColor?: string
+  textColor?: string
+}
 
 export const generateMarkdownCalendar = (
   icalContent: string,
-  currentDate: Date,
+  referenceDate: Date,
 ): string => {
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const frenchDaysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
@@ -30,7 +41,7 @@ export const generateMarkdownCalendar = (
   daysOfWeek.forEach((day, index) => {
     dayTables[day].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
 
-    const startOfCurrentWeek = mondayOfCurrentWeek(currentDate)
+    const startOfCurrentWeek = mondayOfWeek(referenceDate)
     const currentDay = addDays(startOfCurrentWeek, index)
 
     markdownCalendar.push(`## ${frenchDaysOfWeek[index]} ${format(currentDay, 'dd/MM/yyyy')}\n\n`)
@@ -44,10 +55,70 @@ export const generateMarkdownCalendar = (
     markdownCalendar.push('\n')
   })
 
-  return `# EDT du ${format(mondayOfCurrentWeek(currentDate), 'dd/MM/yyyy')} au ${format(
-    lastDayOfWeek(currentDate),
+  return `# EDT du ${format(mondayOfWeek(referenceDate), 'dd/MM/yyyy')} au ${format(
+    sundayOfWeek(referenceDate),
     'dd/MM/yyyy',
   )}\n\n${markdownCalendar.join('')}`
+}
+
+export const generateImgCalendar = (icalContent: string, referenceDate: Date): string => {
+  const events = sync.parseICS(icalContent)
+
+  const data: EDTEvent[] = []
+
+  Object.values(events).forEach((event) => {
+    if (event.type === 'VEVENT') {
+      data.push({
+        title: `${event.summary}\n${event.location}\n`,
+        start: `${format(new Date(event.start), 'yyyy-MM-dd')}T${format(new Date(event.start), 'HH:mm')}:00`,
+        end: `${format(new Date(event.end), 'yyyy-MM-dd')}T${format(new Date(event.end), 'HH:mm')}:00`,
+        allDay: false,
+      })
+    }
+  })
+
+  const config = {
+    events: data,
+    initialView: 'timeGridWeek',
+    headerToolbar: {
+      left: '',
+      center: '',
+      right: '',
+    },
+    locale: 'fr',
+    firstDay: 1,
+    weekends: false,
+    slotMinTime: '07:00:00',
+    slotDuration: '00:30:00',
+    allDaySlot: false,
+    initialDate: format(mondayOfWeek(referenceDate), 'yyyy-MM-dd'),
+    nowIndicator: false
+  }
+
+  return `<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <style>
+    #calendar {
+      --fc-today-bg-color: transparent !important;
+    }
+    </style>
+    <script src='http://localhost:${process.env.PORT}/libs/fullcalendar.min.js'></script>
+    <script>
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, ${JSON.stringify(config, null, 2)});
+        calendar.render();
+      });
+
+    </script>
+  </head>
+  <body>
+    <div id='calendar'></div>
+  </body>
+</html>`
 }
 
 export const filterCalendarContent = (content: string, ignoreFields: string[]): string => {

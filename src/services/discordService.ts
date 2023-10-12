@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits } from 'discord.js'
+import { Client, GatewayIntentBits, AttachmentBuilder, MessagePayload } from 'discord.js'
 
 export class DiscordService {
   private client: Client
@@ -23,11 +23,17 @@ export class DiscordService {
     return this.readyPromise
   }
 
-  async sendMessage(channelId: string, message: string) {
+  async sendMessage(channelId: string, message: string, attachment?: Buffer) {
     const channel = this.client.channels.cache.get(channelId)
 
     if (channel?.isTextBased()) {
-        await channel.send(message)
+        if (attachment) {
+          const attachmentMessage = new AttachmentBuilder(attachment, { name: 'edt.png' })
+          const payload = new MessagePayload(channel, { content: message, files: [attachmentMessage] })
+          await channel.send(payload)
+        } else {
+          await channel.send(message)
+        }
     } else {
       console.error(`Channel with ID ${channelId} is not a text channel.`)
     }

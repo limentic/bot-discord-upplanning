@@ -2,7 +2,10 @@ import * as dotenv from 'dotenv'
 import express, { Request, Response, NextFunction } from 'express'
 import routes from './routes'
 import { DiscordService } from './services/discordService'
+import { saveToFile } from './services/fileService'
 import { join } from 'path'
+import * as fs from 'fs'
+import { format, nextMonday } from 'date-fns'
 
 export interface RequestWithDiscordService extends Request {
   discordService: DiscordService
@@ -10,9 +13,11 @@ export interface RequestWithDiscordService extends Request {
 
 dotenv.config()
 
-process.env.TEMP_FOLDER = join(__dirname, '../..', 'temp')
+process.env.TEMP_FOLDER = join(__dirname, '../', 'temp')
 process.env.CALENDAR_FILE_PATH = join(process.env.TEMP_FOLDER, 'calendar.ical')
 process.env.CURRENT_WEEK_PATH = join(process.env.TEMP_FOLDER, 'currentweek')
+
+if (fs.existsSync(process.env.CURRENT_WEEK_PATH!) == false) saveToFile(process.env.CURRENT_WEEK_PATH!, format(nextMonday(new Date()), 'yyyy-MM-dd'))
 
 const discordService = new DiscordService()
 

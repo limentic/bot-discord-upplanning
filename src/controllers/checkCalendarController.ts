@@ -5,17 +5,17 @@ import { readFromFile, saveToFile } from '../services/fileService'
 import { RequestWithDiscordService } from '..'
 import { generateMarkdownCalendar } from '../services/calendarService'
 import { format } from 'date-fns'
-import { mondayOfCurrentWeek, sundayOfCurrentWeek } from '../services/timeService'
+import { mondayOfWeek, sundayOfWeek } from '../services/timeService'
 
 const ignoreFields = ['DTSTAMP', 'SEQUENCE']
 
 export const checkCalendarController = async (req: RequestWithDiscordService, res: Response) => {
   try {
-    const currentweek = readFromFile(process.env.CURRENT_WEEK_FILE_PATH!)
-    const currentDate = new Date(currentweek!)
+    const referenceWeek = readFromFile(process.env.CURRENT_WEEK_PATH!)
+    const referenceDate = new Date(referenceWeek!)
 
-    const firstDate = format(mondayOfCurrentWeek(currentDate), 'yyyy-MM-dd')
-    const lastDate = format(sundayOfCurrentWeek(currentDate), 'yyyy-MM-dd')
+    const firstDate = format(mondayOfWeek(referenceDate), 'yyyy-MM-dd')
+    const lastDate = format(sundayOfWeek(referenceDate), 'yyyy-MM-dd')
 
     const icalContent = await fetchIcal(firstDate, lastDate)
     const previousCalendar = readFromFile(process.env.CALENDAR_FILE_PATH!)
@@ -36,7 +36,10 @@ export const checkCalendarController = async (req: RequestWithDiscordService, re
 
       await req.discordService.sendMessage(
         process.env.DISCORD_CHANNEL_ID!,
-        `> Attention, l'emploi du temps à été modifié ! @everyone: \n ${generateMarkdownCalendar(icalContent, currentDate)}`,
+        `> Attention, l'emploi du temps à été modifié ! @everyone: \n ${generateMarkdownCalendar(
+          icalContent,
+          referenceDate,
+        )}`,
       )
     }
   } catch (error) {

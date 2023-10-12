@@ -1,9 +1,9 @@
 import { startOfWeek, lastDayOfWeek } from 'date-fns'
 
-export function mondayOfCurrentWeek(date: Date): Date {
+export function mondayOfWeek(date: Date): Date {
     return startOfWeek(date, { weekStartsOn: 1 })
 }
 
-export function sundayOfCurrentWeek(date: Date): Date {
+export function sundayOfWeek(date: Date): Date {
     return lastDayOfWeek(date, { weekStartsOn: 1 })
 }
