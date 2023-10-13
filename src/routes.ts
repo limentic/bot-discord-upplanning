@@ -6,17 +6,22 @@ import { setNextWeekController, setPreviousWeekController } from './controllers/
 
 const router = Router();
 
-// I know I've not respected the REST principles here, but I don't care. It's a private API.
 router.get('/ical', icalController);
-router.get('/calendar', generateCalendarController as any);
-router.get('/calendarimg', generateImgCalendarController as any)
-router.get('/check-calendar', checkCalendarController as any);
-router.get('/set-next-week', setNextWeekController);
-router.get('/set-previous-week', setPreviousWeekController);
+router.get('/calendar/markdown', generateCalendarController as any) // I know this is not a good practice, but I don't have time to fix it. Feel free to do a PR.
+router.get('/calendar/img', generateImgCalendarController as any)
+router.get('/calendar/haschanged', checkCalendarController as any);
+router.get('/weeks/next', setNextWeekController);
+router.get('/weeks/previous', setPreviousWeekController)
 
 // Serve libs locally
 router.get('/libs/fullcalendar.min.js', (req, res) => {
     res.sendFile('./libs/fullcalendar-6.1.9/dist/index.global.min.js', { root: __dirname })
+})
+router.get('/libs/bootstrap.min.css', (req, res) => {
+  res.sendFile('./libs/bootstrap-5.1.3/bootstrap.min.css', { root: __dirname })
+})
+router.get('/libs/bootstrap-icons.css', (req, res) => {
+  res.sendFile('./libs/bootstrap-icons-1.8.1/bootstrap-icons.css', { root: __dirname })
 })
 
 export default router;

@@ -7,8 +7,9 @@ import { join } from 'path'
 import * as fs from 'fs'
 import { format, nextMonday } from 'date-fns'
 
-export interface RequestWithDiscordService extends Request {
+export interface CustomRequest extends Request {
   discordService: DiscordService
+  palette: string[]
 }
 
 dotenv.config()
@@ -16,6 +17,9 @@ dotenv.config()
 process.env.TEMP_FOLDER = join(__dirname, '../', 'temp')
 process.env.CALENDAR_FILE_PATH = join(process.env.TEMP_FOLDER, 'calendar.ical')
 process.env.CURRENT_WEEK_PATH = join(process.env.TEMP_FOLDER, 'currentweek')
+process.env.SUMMARY_COLORS_PATH = join(process.env.TEMP_FOLDER, 'summarycolors.json')
+
+const palette = fs.readFileSync(join(__dirname, '../', 'palette.json'), 'utf8') || '[]'
 
 if (fs.existsSync(process.env.CURRENT_WEEK_PATH!) == false) saveToFile(process.env.CURRENT_WEEK_PATH!, format(nextMonday(new Date()), 'yyyy-MM-dd'))
 
@@ -27,12 +31,13 @@ async function startServer() {
   const app = express()
   const port = process.env.PORT || 3000
 
-  function addDiscordService(req: RequestWithDiscordService, res: Response, next: NextFunction) {
+  function addCustomMiddleware(req: CustomRequest, res: Response, next: NextFunction) {
     req.discordService = discordService
+    req.palette = JSON.parse(palette)
     next()
   }
 
-  app.use(addDiscordService as express.RequestHandler)
+  app.use(addCustomMiddleware as express.RequestHandler)
   app.use('/', routes)
 
   app.listen(port, () => {
