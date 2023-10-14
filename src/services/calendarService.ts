@@ -95,8 +95,6 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
 
   saveToFile(process.env.SUMMARY_COLORS_PATH!, JSON.stringify(summaryColors, null, 2))
 
-  console.log(data)
-
   const config = {
     events: data,
     timeZone: 'UTC',
