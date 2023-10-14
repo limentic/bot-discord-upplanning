@@ -1,5 +1,6 @@
 import { format, addDays } from 'date-fns'
-import { sync, VEvent } from 'node-ical'
+import { getTimezoneOffset } from 'date-fns-tz'
+import { sync, VEvent, DateWithTimeZone } from 'node-ical'
 import { mondayOfWeek, sundayOfWeek } from './timeService'
 import { readFromFile, saveToFile } from './fileService'
 
@@ -63,6 +64,9 @@ export const generateMarkdownCalendar = (
 }
 
 export const generateImgCalendar = (icalContent: string, referenceDate: Date, palette: string[]): string => {
+  
+  const offset = getTimezoneOffset('Europe/Paris', new Date()) / 1000 / 60 / 60
+
   const events = sync.parseICS(icalContent)
 
   const data: EDTEvent[] = []
@@ -80,8 +84,8 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
 
       data.push({
         title: `${summary}\n${event.location}`,
-        start: `${format(new Date(event.start), 'yyyy-MM-dd')}T${format(new Date(event.start), 'HH:mm')}:00`,
-        end: `${format(new Date(event.end), 'yyyy-MM-dd')}T${format(new Date(event.end), 'HH:mm')}:00`,
+        start: `${fakeUTCDate(event.start, offset)}`,
+        end: `${fakeUTCDate(event.end, offset)}`,
         allDay: false,
         backgroundColor: color,
         borderColor: darkenColor(color),
@@ -90,9 +94,12 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
   })
 
   saveToFile(process.env.SUMMARY_COLORS_PATH!, JSON.stringify(summaryColors, null, 2))
-  
+
+  console.log(data)
+
   const config = {
     events: data,
+    timeZone: 'UTC',
     initialView: 'timeGridWeek',
     headerToolbar: {
       left: '',
@@ -268,4 +275,12 @@ export const darkenColor = (color: string): string => {
     .padStart(2, '0')}${darkerRgb[2].toString(16).padStart(2, '0')}`
 
   return darkerHex
+}
+
+export const fakeUTCDate = (date: DateWithTimeZone, offset: number): string => {
+  const tempDate = new Date(date)
+  if (offset < 0 || offset > 0) {
+    tempDate.setHours(tempDate.getHours() + offset)
+  }
+  return tempDate.toISOString()
 }

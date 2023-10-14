@@ -14,7 +14,7 @@ results
 tmp
 
 # Build
-dist/
+.dist/
 
 # Coverage reports
 coverage
