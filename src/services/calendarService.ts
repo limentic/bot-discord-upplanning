@@ -136,9 +136,9 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
         white-space: break-spaces;
     }
     </style>
-    <script src='http://localhost:${process.env.PORT}/libs/fullcalendar.min.js'></script>
-    <link href='http://localhost:${process.env.PORT}/libs/bootstrap.min.css' rel='stylesheet'>
-    <link href='http://localhost:${process.env.PORT}/libs/bootstrap-icons.css' rel='stylesheet'>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js'></script>
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css' rel='stylesheet'>
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css' rel='stylesheet'>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
