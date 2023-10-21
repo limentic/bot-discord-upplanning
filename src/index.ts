@@ -15,6 +15,7 @@ export interface CustomRequest extends Request {
 dotenv.config()
 
 process.env.TEMP_FOLDER = join(__dirname, '../', 'temp')
+process.env.LOGS_FOLDER = join(__dirname, '../', 'logs')
 process.env.CALENDAR_FILE_PATH = join(process.env.TEMP_FOLDER, 'calendar.ical')
 process.env.CURRENT_WEEK_PATH = join(process.env.TEMP_FOLDER, 'currentweek')
 process.env.SUMMARY_COLORS_PATH = join(process.env.TEMP_FOLDER, 'summarycolors.json')

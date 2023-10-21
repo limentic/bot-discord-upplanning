@@ -5,7 +5,7 @@ import { readFromFile, saveToFile } from '../services/fileService'
 import { CustomRequest } from '..'
 import { generateImgCalendar } from '../services/calendarService'
 import { format } from 'date-fns'
-import { mondayOfWeek, sundayOfWeek } from '../services/timeService'
+import { fridayOfWeek, mondayOfWeek, sundayOfWeek } from '../services/timeService'
 import { puppeteerRender } from '../services/puppeteerService'
 
 const ignoreFields = ['DTSTAMP', 'SEQUENCE']
@@ -30,17 +30,20 @@ export const checkCalendarController = async (req: CustomRequest, res: Response)
 
     if (isChanged) {
       saveToFile(process.env.CALENDAR_FILE_PATH!, icalContent)
+      saveToFile(`${process.env.LOGS_FOLDER!}/calendar-${new Date().toISOString()}-previous.ical`, previousCalendar!)
+      saveToFile(`${process.env.LOGS_FOLDER!}/calendar-${new Date().toISOString()}-current.ical`, icalContent)
 
       const buffer = await puppeteerRender(generateImgCalendar(icalContent, referenceDate, req.palette))
 
       const message = await req.discordService.getLastMessage(process.env.DISCORD_CHANNEL_ID!)
       await req.discordService.deleteMessage(process.env.DISCORD_CHANNEL_ID!, message?.id || '')
+
       await req.discordService.sendMessage(
         process.env.DISCORD_CHANNEL_ID!,
         `@everyone\n# ⚠️ Attention ⚠️ L'EDT pour la semaine du ${format(
           mondayOfWeek(referenceDate),
           'dd/MM/yyyy',
-        )} au ${format(sundayOfWeek(referenceDate), 'dd/MM/yyyy')} à été modifié: \n`,
+        )} au ${format(fridayOfWeek(referenceDate), 'dd/MM/yyyy')} à été modifié: \n`,
 
         buffer,
       )

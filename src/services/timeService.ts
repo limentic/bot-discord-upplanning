@@ -7,3 +7,8 @@ export function mondayOfWeek(date: Date): Date {
 export function sundayOfWeek(date: Date): Date {
     return lastDayOfWeek(date, { weekStartsOn: 1 })
 }
+
+export function fridayOfWeek(date: Date): Date {
+    const sunday = sundayOfWeek(date)
+    return new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() - 2)
+}
