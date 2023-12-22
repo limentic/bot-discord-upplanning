@@ -23,6 +23,7 @@
     "express": "^4.18.2",
     "node-ical": "^0.16.1",
     "puppeteer": "^21.3.8",
+    "sharp": "^0.33.1",
     "typescript": "^5.2.2"
   },
   "devDependencies": {

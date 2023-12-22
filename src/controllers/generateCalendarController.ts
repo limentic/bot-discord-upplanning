@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { CustomRequest } from '..'
 import { fetchIcal } from '../services/icalService';
-import { generateImgCalendar } from '../services/calendarService'
+import { generateImgv2Calendar as generateImgCalendar } from '../services/calendarService'
 import { format } from 'date-fns'
 import { mondayOfWeek, sundayOfWeek, fridayOfWeek } from '../services/timeService'
 import { readFromFile } from '../services/fileService';
