@@ -7,7 +7,6 @@ import { CustomRequest } from '..'
 import { generateImgv2Calendar } from '../services/calendarService'
 import { format } from 'date-fns'
 import { fridayOfWeek, mondayOfWeek, sundayOfWeek } from '../services/timeService'
-// import { puppeteerRender } from '../services/puppeteerService'
 
 const ignoreFields = ['DTSTAMP', 'SEQUENCE']
 
@@ -42,7 +41,7 @@ export const checkCalendarController = async (req: CustomRequest, res: Response)
 
       await req.discordService.sendMessage(
         process.env.DISCORD_CHANNEL_ID!,
-        `THIS IS A TEST ${format(
+        `@everyone\n# L'emploi du temps pour la semaine du ${format(
           mondayOfWeek(referenceDate),
           'dd/MM/yyyy',
         )} au ${format(fridayOfWeek(referenceDate), 'dd/MM/yyyy')} à été modifié: \n`,
