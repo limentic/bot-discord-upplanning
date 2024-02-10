@@ -1,12 +1,12 @@
 import { Response } from 'express'
+import sharp from 'sharp'
 import { filterCalendarContent } from '../services/calendarService'
 import { fetchIcal } from '../services/icalService'
 import { readFromFile, saveToFile } from '../services/fileService'
 import { CustomRequest } from '..'
-import { generateImgCalendar } from '../services/calendarService'
+import { generateImgv2Calendar } from '../services/calendarService'
 import { format } from 'date-fns'
 import { fridayOfWeek, mondayOfWeek, sundayOfWeek } from '../services/timeService'
-import { puppeteerRender } from '../services/puppeteerService'
 
 const ignoreFields = ['DTSTAMP', 'SEQUENCE']
 
@@ -19,6 +19,7 @@ export const checkCalendarController = async (req: CustomRequest, res: Response)
     const lastDate = format(sundayOfWeek(referenceDate), 'yyyy-MM-dd')
 
     const icalContent = await fetchIcal(firstDate, lastDate)
+
     const previousCalendar = readFromFile(process.env.CALENDAR_FILE_PATH!)
 
     const filteredIcalContent = filterCalendarContent(icalContent, ignoreFields)
@@ -33,14 +34,14 @@ export const checkCalendarController = async (req: CustomRequest, res: Response)
       saveToFile(`${process.env.LOGS_FOLDER!}/calendar-${new Date().toISOString()}-previous.ical`, previousCalendar!)
       saveToFile(`${process.env.LOGS_FOLDER!}/calendar-${new Date().toISOString()}-current.ical`, icalContent)
 
-      const buffer = await puppeteerRender(generateImgCalendar(icalContent, referenceDate, req.palette))
+      const buffer = await sharp(Buffer.from(generateImgv2Calendar(icalContent, referenceDate, req.palette)), {density: 600}).png().toBuffer()
 
       const message = await req.discordService.getLastMessage(process.env.DISCORD_CHANNEL_ID!)
       await req.discordService.deleteMessage(process.env.DISCORD_CHANNEL_ID!, message?.id || '')
 
       await req.discordService.sendMessage(
         process.env.DISCORD_CHANNEL_ID!,
-        `@everyone\n# ⚠️ Attention ⚠️ L'EDT pour la semaine du ${format(
+        `@everyone\n# L'emploi du temps pour la semaine du ${format(
           mondayOfWeek(referenceDate),
           'dd/MM/yyyy',
         )} au ${format(fridayOfWeek(referenceDate), 'dd/MM/yyyy')} à été modifié: \n`,

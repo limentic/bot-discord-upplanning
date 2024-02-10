@@ -1,12 +1,11 @@
 import { Response } from 'express';
 import { CustomRequest } from '..'
 import { fetchIcal } from '../services/icalService';
-import { generateImgCalendar } from '../services/calendarService'
+import sharp from 'sharp'
+import { generateImgv2Calendar } from '../services/calendarService'
 import { format } from 'date-fns'
 import { mondayOfWeek, sundayOfWeek, fridayOfWeek } from '../services/timeService'
 import { readFromFile } from '../services/fileService';
-
-import { puppeteerRender } from '../services/puppeteerService';
 
 export const generateImgCalendarController = async (req: CustomRequest, res: Response) => {
   try {
@@ -17,7 +16,11 @@ export const generateImgCalendarController = async (req: CustomRequest, res: Res
     const lastDate = format(sundayOfWeek(referenceDate), 'yyyy-MM-dd')
 
     const icalContent = await fetchIcal(firstDate, lastDate)
-    const buffer = await puppeteerRender(generateImgCalendar(icalContent, referenceDate, req.palette))
+    const buffer = await sharp(Buffer.from(generateImgv2Calendar(icalContent, referenceDate, req.palette)), {
+      density: 600,
+    })
+      .png()
+      .toBuffer()
 
     const message = await req.discordService.getLastMessage(process.env.DISCORD_CHANNEL_ID!)
     await req.discordService.deleteMessage(process.env.DISCORD_CHANNEL_ID!, message?.id || '')
