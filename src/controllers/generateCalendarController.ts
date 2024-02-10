@@ -1,11 +1,11 @@
 import { Response } from 'express';
 import { CustomRequest } from '..'
 import { fetchIcal } from '../services/icalService';
-import sharp from 'sharp'
-import { generateImgv2Calendar } from '../services/calendarService'
+import { generateImgCalendar } from '../services/calendarService'
 import { format } from 'date-fns'
 import { mondayOfWeek, sundayOfWeek, fridayOfWeek } from '../services/timeService'
 import { readFromFile } from '../services/fileService';
+import { convertSvgToPng } from '../services/vipsService'
 
 export const generateImgCalendarController = async (req: CustomRequest, res: Response) => {
   try {
@@ -16,11 +16,8 @@ export const generateImgCalendarController = async (req: CustomRequest, res: Res
     const lastDate = format(sundayOfWeek(referenceDate), 'yyyy-MM-dd')
 
     const icalContent = await fetchIcal(firstDate, lastDate)
-    const buffer = await sharp(Buffer.from(generateImgv2Calendar(icalContent, referenceDate, req.palette)), {
-      density: 600,
-    })
-      .png()
-      .toBuffer()
+
+    const buffer = convertSvgToPng(generateImgCalendar(icalContent, referenceDate, req.palette))
 
     const message = await req.discordService.getLastMessage(process.env.DISCORD_CHANNEL_ID!)
     await req.discordService.deleteMessage(process.env.DISCORD_CHANNEL_ID!, message?.id || '')
@@ -33,10 +30,6 @@ export const generateImgCalendarController = async (req: CustomRequest, res: Res
 
       buffer,
     )
-
-    res.json({
-      status: 'OK',
-    })
   } catch (error) {
     console.error('Error in calendar controller:', error)
     res.status(500).json({ error: 'Internal Server Error' })
