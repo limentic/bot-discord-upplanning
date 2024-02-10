@@ -15,7 +15,7 @@ interface EDTEvent {
   textColor?: string
 }
 
-export const generateImgv2Calendar = (icalContent: string, referenceDate: Date, palette: string[]): string => {
+export const generateImgCalendar = (icalContent: string, referenceDate: Date, palette: string[]): string => {
   const events = sync.parseICS(icalContent)
 
   const data: EDTEvent[] = []
