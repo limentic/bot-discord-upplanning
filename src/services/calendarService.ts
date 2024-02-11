@@ -1,48 +1,11 @@
-import { getTimezoneOffset, utcToZonedTime } from 'date-fns-tz'
 import { format } from 'date-fns'
-import { sync, DateWithTimeZone } from 'node-ical'
+import { DateWithTimeZone } from 'node-ical'
 import { readFromFile, saveToFile } from './fileService'
 import { fr } from 'date-fns/locale'
+import { icalEvent } from '../types'
 
-interface EDTEvent {
-  id?: string | number
-  title: string
-  start: DateWithTimeZone
-  end?: DateWithTimeZone
-  allDay?: boolean
-  backgroundColor?: string
-  borderColor?: string
-  textColor?: string
-}
-
-export const generateImgCalendar = (icalContent: string, referenceDate: Date, palette: string[]): string => {
-  const events = sync.parseICS(icalContent)
-
-  const data: EDTEvent[] = []
+export const generateImgCalendar = (icalContent: icalEvent[], palette: string[]): string => {
   const summaryColors: { [key: string]: string } = JSON.parse(readFromFile(process.env.SUMMARY_COLORS_PATH!)!) || {}
-
-  Object.values(events).forEach((event) => {
-    if (event.type === 'VEVENT') {
-      const summary = event.summary.trim()
-      let color = summaryColors[summary]
-
-      if (!color) {
-        color = getRandomColorFromPalette(palette)
-        summaryColors[summary] = color
-      }
-
-      data.push({
-        title: `${summary}\n${event.location}`,
-        start: event.start,
-        end: event.end,
-        allDay: false,
-        backgroundColor: color,
-        borderColor: darkenColor(color),
-      })
-    }
-  })
-
-  saveToFile(process.env.SUMMARY_COLORS_PATH!, JSON.stringify(summaryColors, null, 2))
 
   const dayLabels = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi']
   const hours = Array.from({ length: 15 }, (_, index) => index + 7) // 7 AM to 21 PM
@@ -126,36 +89,41 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
   })
 
   // Draw events
-  data.forEach((event) => {
-    const offset = getTimezoneOffset('Europe/Paris', new Date()) / 1000 / 60 / 60
+  icalContent.forEach((event) => {
+    const summary = event.summary.trim()
+    let color = summaryColors[summary]
 
-    // I do this parse(stringify()) thingy to retrieve a normal Date object from the DateWithTimeZone object
-    let startDate = new Date(JSON.parse(JSON.stringify(event.start)))
-    let endDate = new Date(JSON.parse(JSON.stringify(event.end)))
-
-    startDate = utcToZonedTime(startDate, 'Europe/Paris')
-    endDate = utcToZonedTime(endDate, 'Europe/Paris')
+    if (!color) {
+      event.backgroundColor = getRandomColorFromPalette(palette)
+      event.borderColor = darkenColor(event.backgroundColor)
+      summaryColors[summary] = event.backgroundColor
+    } else {
+      event.backgroundColor = color
+      event.borderColor = darkenColor(color)
+    }
 
     // Start Y ==============================
     const startHourObject = hoursCoordinates.find(
-      (item) => item.hour === Number(format(startDate, 'H', { locale: fr })),
+      (item) => item.hour === Number(format(event.start, 'H', { locale: fr })),
     )!
     let pixelsPerMinutes = (startHourObject.end - startHourObject.start) / 60
-    let pixelsToAdd = Math.round(pixelsPerMinutes * Number(format(startDate, 'm', { locale: fr })))
+    let pixelsToAdd = Math.round(pixelsPerMinutes * Number(format(event.start, 'm', { locale: fr })))
     const startYCoordinate = startHourObject.start + pixelsToAdd
     // ======================================
 
     // Start X ==============================
     const dayCoordinate = daysCoordinates.find(
-      (item) => item.day == Number(format(startDate, 'c', { locale: fr })) - 1,
+      (item) => item.day == Number(format(event.start, 'c', { locale: fr })) - 1,
     )!
     const startXCoordinate = dayCoordinate.start
     // ======================================
 
     // Height ===============================
-    const endHourObject = hoursCoordinates.find((item) => item.hour === Number(format(endDate, 'H', { locale: fr })))!
+    const endHourObject = hoursCoordinates.find(
+      (item) => item.hour === Number(format(event.end, 'H', { locale: fr })),
+    )!
     pixelsPerMinutes = (endHourObject.end - endHourObject.start) / 60
-    pixelsToAdd = Math.round(pixelsPerMinutes * Number(format(endDate, 'm', { locale: fr })))
+    pixelsToAdd = Math.round(pixelsPerMinutes * Number(format(event.end, 'm', { locale: fr })))
     const height = endHourObject.start + pixelsToAdd - startYCoordinate
     // ======================================
 
@@ -170,11 +138,15 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
     // Draw start and end time
     svgContent += `<text x="${startXCoordinate + 10}" y="${
       startYCoordinate + 18
-    }" fill="white" font-weight="bold">${format(startDate, 'HH:mm', { locale: fr })} - ${format(endDate, 'HH:mm', {
-      locale: fr,
-    })}</text>`
+    }" fill="white" font-weight="bold">${format(event.start, 'HH:mm', { locale: fr })} - ${format(
+      event.end,
+      'HH:mm',
+      {
+        locale: fr,
+      },
+    )}</text>`
 
-    let text = escapeHtml(event.title)
+    let text = escapeHtml(`${event.summary}\n${event.location}\n${extractProfessorName(event.description) || ''}`)
 
     const stringWidth = 180
     const spaceBetweenLines = 15
@@ -189,9 +161,7 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
 
       if (testLineLength > stringWidth) {
         // Draw the current line
-        svgContent += `<text x="${
-          startXCoordinate + 10
-        }" y="${currentY}" fill="white">${currentLine}</text>`
+        svgContent += `<text x="${startXCoordinate + 10}" y="${currentY}" fill="white">${currentLine}</text>`
         currentLine = word
         currentY += spaceBetweenLines
       } else {
@@ -200,9 +170,7 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
 
       // Draw the last line
       if (index === words.length - 1) {
-        svgContent += `<text x="${
-          startXCoordinate + 10
-        }" y="${currentY}" fill="white">${currentLine}</text>`
+        svgContent += `<text x="${startXCoordinate + 10}" y="${currentY}" fill="white">${currentLine}</text>`
       }
     })
   })
@@ -213,6 +181,7 @@ export const generateImgCalendar = (icalContent: string, referenceDate: Date, pa
   // Make the SVG content output one line
   svgContent = svgContent.replace(/\n/g, '').trim()
 
+  saveToFile(process.env.SUMMARY_COLORS_PATH!, JSON.stringify(summaryColors, null, 2))
   return svgContent
 }
 
@@ -363,4 +332,20 @@ const escapeHtml = (inputString: string): string => {
   const htmlEscapeRegex: RegExp = new RegExp(`[${Object.keys(htmlEntities).join('')}]`, 'g')
 
   return inputString.replace(htmlEscapeRegex, (match) => htmlEntities[match])
+}
+
+function extractProfessorName(description: string): string | null {
+  const regex1 = /\n\n([\w-]+)\n(.+?)\n\n/
+  const match = description.match(regex1)
+  if (match) {
+    return match[2]
+  }
+
+  const regex2 = /\n\n([\w-]+)\n([\w-]+)\n(.+?)\n\n/
+  const match2 = description.match(regex2)
+
+  if (match2) {
+    return match2[3]
+  }
+  return null
 }
