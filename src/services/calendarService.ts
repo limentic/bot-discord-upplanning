@@ -1,106 +1,188 @@
-import { format, addDays } from 'date-fns'
-import { getTimezoneOffset } from 'date-fns-tz'
-import { sync, VEvent, DateWithTimeZone } from 'node-ical'
-import { mondayOfWeek, sundayOfWeek } from './timeService'
+import { format } from 'date-fns'
+import { DateWithTimeZone } from 'node-ical'
 import { readFromFile, saveToFile } from './fileService'
+import { fr } from 'date-fns/locale'
+import { icalEvent } from '../types'
 
-interface EDTEvent {
-  id?: string | number
-  title: string
-  start: string | Date
-  end?: string | Date
-  allDay?: boolean
-  backgroundColor?: string
-  borderColor?: string
-  textColor?: string
-}
-
-export const generateImgCalendar = (icalContent: string, referenceDate: Date, palette: string[]): string => {
-  
-  const offset = getTimezoneOffset('Europe/Paris', new Date()) / 1000 / 60 / 60
-
-  const events = sync.parseICS(icalContent)
-
-  const data: EDTEvent[] = []
+export const generateImgCalendar = (icalContent: icalEvent[], palette: string[]): string => {
   const summaryColors: { [key: string]: string } = JSON.parse(readFromFile(process.env.SUMMARY_COLORS_PATH!)!) || {}
 
-  Object.values(events).forEach((event) => {
-    if (event.type === 'VEVENT') {
-      const summary = event.summary.trim()
-      let color = summaryColors[summary]
+  const dayLabels = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi']
+  const hours = Array.from({ length: 15 }, (_, index) => index + 7) // 7 AM to 21 PM
 
-      if (!color) {
-        color = getRandomColorFromPalette(palette)
-        summaryColors[summary] = color
-      }
+  const cellWidth = 200
+  const cellHeight = 50
+  const calendarWidth = dayLabels.length * cellWidth
+  const calendarHeight = hours.length * cellHeight
 
-      data.push({
-        title: `${summary}\n${event.location}`,
-        start: `${fakeUTCDate(event.start, offset)}`,
-        end: `${fakeUTCDate(event.end, offset)}`,
-        allDay: false,
-        backgroundColor: color,
-        borderColor: darkenColor(color),
-      })
-    }
+  const sideBarWidth = 50 // Adjust the side bar width as needed
+  const topBarHeight = 30 // Adjust the top bar height as needed
+  const rightMargin = 20 // Adjust the right margin as needed
+  const bottomMargin = 20 // Adjust the bottom margin as needed
+
+  // Generate SVG header with white background and margins
+  let svgContent = `<svg width="${calendarWidth + sideBarWidth + rightMargin}" height="${
+    calendarHeight + topBarHeight + bottomMargin
+  }" xmlns="http://www.w3.org/2000/svg">`
+
+  // Draw white background
+  svgContent += `<rect width="100%" height="100%" fill="white"/>`
+
+  svgContent += `
+    <style>
+      <![CDATA[
+        text {
+          font-family: 'Open-sans', 'Arial', sans-serif; // Use a generic font family
+        }
+      ]]>
+    </style>
+  `
+
+  // Draw top bar with centered day labels
+  dayLabels.forEach((day, index) => {
+    const x = index * cellWidth + sideBarWidth + cellWidth / 2 // Adjusted for centering
+
+    // Draw centered day label
+    svgContent += `<text x="${x}" y="${
+      topBarHeight / 2 + 4
+    }" text-anchor="middle" dominant-baseline="middle" font-size="14px" font-weight="400">${day}</text>`
   })
 
+  // Array to store the start and end coordinates of each hour
+  const hoursCoordinates: { hour: number; start: number; end: number }[] = []
+  const daysCoordinates: { day: number; start: number; end: number }[] = []
+
+  // Draw time slots and events
+  hours.forEach((hour, rowIndex) => {
+    const y = rowIndex * cellHeight + topBarHeight
+    // Draw cells for each day
+    dayLabels.forEach((_, columnIndex) => {
+      const x = columnIndex * cellWidth + sideBarWidth
+
+      // Draw cell borders
+      svgContent += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" stroke="#e1e1e1" fill="none"/>`
+
+      // Draw a dotted line to indicate the half hour
+      svgContent += `<line x1="${x}" y1="${y + cellHeight / 2}" x2="${x + cellWidth}" y2="${
+        y + cellHeight / 2
+      }" stroke="#e8e8e8" stroke-dasharray="5"/>`
+
+      // Draw time labels in the side bar
+      if (columnIndex === 0) {
+        // draw a bar at the y coordinates of the length of the image (for debug purposes)
+        // svgContent += `<rect x="0" y="${y}" width="${sideBarWidth}" height="1" stroke="red" fill="none"/>`
+
+        svgContent += `<text dominant-baseline="hanging" text-anchor="middle" font-size="14px" font-weight="400" x="${sideBarWidth / 2}" y="${
+          y + 12
+        }">${hour}:00</text>`
+
+        // Store the start and end coordinates of the hour remove the side bar width as well as the cell width to get the correct coordinates
+        // hourCoordinates[hour] = { start: y, end: y + cellHeight }
+        hoursCoordinates[rowIndex] = { hour, start: y, end: y + cellHeight }
+      }
+
+      // Store the start and end coordinates of the day
+      if (rowIndex === 0) {
+        daysCoordinates[columnIndex] = { day: columnIndex, start: x, end: x + cellWidth }
+      }
+    })
+  })
+
+  // Draw events
+  icalContent.forEach((event) => {
+    const summary = event.summary.trim()
+    let color = summaryColors[summary]
+
+    if (!color) {
+      event.backgroundColor = getRandomColorFromPalette(palette)
+      event.borderColor = darkenColor(event.backgroundColor)
+      summaryColors[summary] = event.backgroundColor
+    } else {
+      event.backgroundColor = color
+      event.borderColor = darkenColor(color)
+    }
+
+    // Start Y ==============================
+    const startHourObject = hoursCoordinates.find(
+      (item) => item.hour === Number(format(event.start, 'H', { locale: fr })),
+    )!
+    let pixelsPerMinutes = (startHourObject.end - startHourObject.start) / 60
+    let pixelsToAdd = Math.round(pixelsPerMinutes * Number(format(event.start, 'm', { locale: fr })))
+    const startYCoordinate = startHourObject.start + pixelsToAdd
+    // ======================================
+
+    // Start X ==============================
+    const dayCoordinate = daysCoordinates.find(
+      (item) => item.day == Number(format(event.start, 'c', { locale: fr })) - 1,
+    )!
+    const startXCoordinate = dayCoordinate.start
+    // ======================================
+
+    // Height ===============================
+    const endHourObject = hoursCoordinates.find(
+      (item) => item.hour === Number(format(event.end, 'H', { locale: fr })),
+    )!
+    pixelsPerMinutes = (endHourObject.end - endHourObject.start) / 60
+    pixelsToAdd = Math.round(pixelsPerMinutes * Number(format(event.end, 'm', { locale: fr })))
+    const height = endHourObject.start + pixelsToAdd - startYCoordinate
+    // ======================================
+
+    // Width ================================
+    const width = dayCoordinate.end - dayCoordinate.start
+    // ======================================
+
+    svgContent += `<rect x="${startXCoordinate + 0.5}" y="${startYCoordinate + 0.5}" width="${width - 1 - 5}" height="${
+      height - 1
+    }" stroke="${event.borderColor}" stroke-width="2" fill="${event.backgroundColor}" rx="4" ry="4"/>`
+
+    // Draw start and end time
+    svgContent += `<text x="${startXCoordinate + 10}" y="${
+      startYCoordinate + 18
+    }" fill="white" font-weight="bold">${format(event.start, 'HH:mm', { locale: fr })} - ${format(
+      event.end,
+      'HH:mm',
+      {
+        locale: fr,
+      },
+    )}</text>`
+
+    let text = escapeHtml(`${event.summary}\n${event.location}\n${extractProfessorName(event.description) || ''}`)
+
+    const stringWidth = 180
+    const spaceBetweenLines = 15
+
+    const words = text.split(/\s+/)
+    let currentLine = ''
+    let currentY = startYCoordinate + 38
+
+    words.forEach((word, index) => {
+      const testLine = currentLine ? `${currentLine} ${word}` : word
+      const testLineLength = testLine.length * 8
+
+      if (testLineLength > stringWidth) {
+        // Draw the current line
+        svgContent += `<text x="${startXCoordinate + 10}" y="${currentY}" fill="white">${currentLine}</text>`
+        currentLine = word
+        currentY += spaceBetweenLines
+      } else {
+        currentLine = testLine
+      }
+
+      // Draw the last line
+      if (index === words.length - 1) {
+        svgContent += `<text x="${startXCoordinate + 10}" y="${currentY}" fill="white">${currentLine}</text>`
+      }
+    })
+  })
+
+  // Close the SVG tag
+  svgContent += '</svg>'
+
+  // Make the SVG content output one line
+  svgContent = svgContent.replace(/\n/g, '').trim()
+
   saveToFile(process.env.SUMMARY_COLORS_PATH!, JSON.stringify(summaryColors, null, 2))
-
-  const config = {
-    events: data,
-    timeZone: 'UTC',
-    initialView: 'timeGridWeek',
-    headerToolbar: {
-      left: '',
-      center: '',
-      right: '',
-    },
-    locale: 'fr',
-    firstDay: 1,
-    weekends: false,
-    slotMinTime: '07:00:00',
-    slotDuration: '00:30:00',
-    allDaySlot: false,
-    initialDate: format(mondayOfWeek(referenceDate), 'yyyy-MM-dd'),
-    nowIndicator: false,
-    themeSystem: 'bootstrap5',
-  }
-
-  return `<!DOCTYPE html>
-<html lang='en'>
-  <head>
-    <meta charset='utf-8' />
-    <style>
-    #calendar {
-      --fc-today-bg-color: transparent !important;
-    }
-    .fc-direction-ltr .fc-daygrid-event.fc-event-end,
-    .fc-event-main-frame {
-        flex-direction: column;
-        text-align: left;
-    }
-
-    .fc-event-desc,
-    .fc-event-title {
-        white-space: break-spaces;
-    }
-    </style>
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js'></script>
-    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css' rel='stylesheet'>
-    <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css' rel='stylesheet'>
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
-        var calendar = new FullCalendar.Calendar(calendarEl, ${JSON.stringify(config, null, 2)});
-        calendar.render();
-      });
-    </script>
-  </head>
-  <body>
-    <div id='calendar'></div>
-  </body>
-</html>`
+  return svgContent
 }
 
 export const filterCalendarContent = (content: string, ignoreFields: string[]): string => {
@@ -111,11 +193,11 @@ export const filterCalendarContent = (content: string, ignoreFields: string[]): 
 
 export const getRandomColorFromPalette = (palette: string[]): string => {
   if (palette.length === 0) {
-    return '';  // Return an empty string if the palette is empty
+    return '' // Return an empty string if the palette is empty
   }
 
-  const randomIndex = Math.floor(Math.random() * palette.length);
-  return palette[randomIndex];
+  const randomIndex = Math.floor(Math.random() * palette.length)
+  return palette[randomIndex]
 }
 
 export const darkenColor = (color: string): string => {
@@ -227,10 +309,43 @@ export const darkenColor = (color: string): string => {
   return darkerHex
 }
 
-export const fakeUTCDate = (date: DateWithTimeZone, offset: number): string => {
+export const fakeUTCDate = (date: DateWithTimeZone, offset: number): Date => {
+  console.log(date)
   const tempDate = new Date(date)
+  console.log(tempDate)
   if (offset < 0 || offset > 0) {
     tempDate.setHours(tempDate.getHours() + offset)
   }
-  return tempDate.toISOString()
+  console.log(tempDate)
+  return new Date(tempDate)
+}
+
+const escapeHtml = (inputString: string): string => {
+  const htmlEntities: { [key: string]: string } = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }
+
+  const htmlEscapeRegex: RegExp = new RegExp(`[${Object.keys(htmlEntities).join('')}]`, 'g')
+
+  return inputString.replace(htmlEscapeRegex, (match) => htmlEntities[match])
+}
+
+function extractProfessorName(description: string): string | null {
+  const regex1 = /\n\n([\w-]+)\n(.+?)\n\n/
+  const match = description.match(regex1)
+  if (match) {
+    return match[2]
+  }
+
+  const regex2 = /\n\n([\w-]+)\n([\w-]+)\n(.+?)\n\n/
+  const match2 = description.match(regex2)
+
+  if (match2) {
+    return match2[3]
+  }
+  return null
 }
